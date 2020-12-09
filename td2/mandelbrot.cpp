@@ -144,10 +144,7 @@ int main( int nargs, char* argv[] ) {
 	//    2. d'attribuer à chaque processus un identifiant ( entier ) unique pour
 	//       le communicateur COMM_WORLD
 	//    3. etc...
-    const int W = 800;
-    const int H = 600;
-    const int maxIter = 8*65536;
-    std::vector<int> pixels(W*H);
+    
 	MPI_Init( &nargs, &argv );
 	// Pour des raisons de portabilité qui débordent largement du cadre
 	// de ce cours, on préfère toujours cloner le communicateur global
@@ -164,22 +161,31 @@ int main( int nargs, char* argv[] ) {
 	// l'utilisateur )
     int rank;
 	MPI_Comm_rank(globComm, &rank);
-
+    const int W = 800;
+    const int H = 600;
+    const int maxIter = 8*65536;
+    std::vector<int> set(W*H);
+    int lines = H/(nbp-1);
+    int pixels_per_process = W * lines;
+    ;
+    MPI_Request request[nbp-1] ;
     if (rank == 0) {
-        std::vector<int> pixels(W*H);
-        for (int i = 0; i < nbp ; i ++) {
-            MPI_Send(pixels.data(), 1, MPI_INT, i,0,MPI_COMM_WORLD);
+        for (int i = 1; i< nbp ; i ++){
+            
+            MPI_Irecv(set.data()+(i-1)*pixels_per_process, pixels_per_process, MPI_INT,i, 0, MPI_COMM_WORLD, &request[i-1]) ; 
         }
+        MPI_Waitall(nbp-1, request, MPI_STATUSES_IGNORE);
+        savePicture("mandelbrot.tga", W, H, set, maxIter);
+    }    
+    else {
+        std::vector<int> pixels(pixels_per_process);
+        for (int i =0 ; i<lines ; i ++){
+            computeMandelbrotSetRow(W,H,maxIter,lines*(rank-1) + i, pixels.data() + i*W);
+        }
+        std::cout << rank << "J'ai fini" << std::endl ;
+        MPI_Send(pixels.data(), pixels_per_process, MPI_INT, 0,0, MPI_COMM_WORLD);
+         std::cout << rank << "J'ai envoyé" << std::endl ;
     }
-	
-    
-    MPI_Status status;
-    int* truc ;
-    MPI_Recv(& truc, 1,MPI_INT, 0, 0,MPI_COMM_WORLD, &status);
-    for (int i = rank * H/nbp; i< (rank+1)*H/nbp; i ++ ) {
-        computeMandelbrotSetRow( W, H, maxIter, i, truc + W*(H-i-1) );
-    };         
-    
 	MPI_Finalize();
 	return EXIT_SUCCESS;
 }
