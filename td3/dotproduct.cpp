@@ -26,7 +26,10 @@ int main( int nargs, char* vargs[])
   
   start = std::chrono::system_clock::now();
   std::vector<std::vector<double>> U(nbSamples), V(nbSamples);
-  #pragma omp for OMP_NUM_THREADS(15)
+  #pragma omp parralel
+  {
+
+  #pragma omp for nowait
   for ( int iSample = 0; iSample < nbSamples; ++iSample ) {
     U[iSample] = std::vector<double>(N);
     V[iSample] = std::vector<double>(N);
@@ -35,6 +38,7 @@ int main( int nargs, char* vargs[])
       V[iSample][i] = (nbSamples - iSample + i)%N;
     }
   }
+  }
   end = std::chrono::system_clock::now();
   std::chrono::duration<double> elapsed_seconds = end-start;
   std::cout << "Temps assemblage vecteurs : " << elapsed_seconds.count() 
@@ -42,9 +46,12 @@ int main( int nargs, char* vargs[])
 
   start = std::chrono::system_clock::now();
   std::vector<double> result(nbSamples);
-  #pragma omp for OMP_NUM_THREADS(4)
+  #pragma omp parralel 
+  {
+  #pragma omp for nowait
   for ( int iSample = 0; iSample < nbSamples; ++iSample )
     result[iSample] = dot(U[iSample],V[iSample]);
+  }
   end = std::chrono::system_clock::now();
   elapsed_seconds = end-start;
   std::cout << "Temps produits scalaires : " << elapsed_seconds.count() 
@@ -52,8 +59,7 @@ int main( int nargs, char* vargs[])
 
   start = std::chrono::system_clock::now();
   double ref = result[0];
-  double sum = 0;;
-  #pragma omp for OMP_NUM_THREADS(4)
+  double sum = 0;
   for ( const auto& val : result )
     sum += val;
   sum /= ref;
